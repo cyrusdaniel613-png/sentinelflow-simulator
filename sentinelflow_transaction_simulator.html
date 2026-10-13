@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelFlow Transaction Simulator & Monitoring System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Dashboards -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        darkbg: '#090D16',
+                        cardbg: '#0C1220',
+                        bordercol: '#1E293B',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #090D16; color: #F8FAFC; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #090D16; }
+        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.02); }
+        }
+        .animate-glow { animation: pulseGlow 3s infinite ease-in-out; }
+    </style>
+</head>
+<body class="h-full flex overflow-hidden">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="w-72 bg-[#0C1220] border-r border-[#1E293B] flex flex-col justify-between shrink-0 select-none z-20">
+        <div>
+            <!-- Brand Header -->
+            <div class="p-6 border-b border-[#1E293B] flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-black font-bold">
+                    <i class="fa-solid fa-shield-halved text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold tracking-wider text-base bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">SENTINELFLOW</h1>
+                    <p class="text-[10px] text-slate-400 font-mono tracking-wide">TX MONITOR & SIMULATOR</p>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="p-4 space-y-1.5" id="sidebar-nav">
+                <button onclick="switchTab('overview')" data-tab="overview" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-chart-pie w-4 h-4 text-emerald-400"></i>
+                        <span>Overview</span>
+                    </div>
+                </button>
+                <button onclick="switchTab('simulator')" data-tab="simulator" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/50 border border-transparent">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-play w-4 h-4 text-slate-500"></i>
+                        <span>Transaction Simulator</span>
+                    </div>
+                </button>
+                <button onclick="switchTab('transactions')" data-tab="transactions" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/50 border border-transparent">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-database w-4 h-4 text-slate-500"></i>
+                        <span>Live Transactions</span>
+                    </div>
+                    <span id="badge-txs" class="px-2 py-0.5 text-xs font-mono rounded-full font-bold bg-[#1E293B] text-slate-300">0</span>
+                </button>
+                <button onclick="switchTab('incidents')" data-tab="incidents" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/50 border border-transparent">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-triangle-exclamation w-4 h-4 text-slate-500"></i>
+                        <span>Incidents</span>
+                    </div>
+                    <span id="badge-incidents" class="px-2 py-0.5 text-xs font-mono rounded-full font-bold bg-[#1E293B] text-slate-300">0</span>
+                </button>
+                <button onclick="switchTab('recovery')" data-tab="recovery" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/50 border border-transparent">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-rotate-left w-4 h-4 text-slate-500"></i>
+                        <span>Recovery Center</span>
+                    </div>
+                    <span id="badge-recoveries" class="px-2 py-0.5 text-xs font-mono rounded-full font-bold bg-[#1E293B] text-slate-300">0</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Sidebar Footer & Demo Controls -->
+        <div class="p-4 border-t border-[#1E293B] bg-[#090D16]/40 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                <span>DEMO ENVIRONMENT</span>
+                <span class="text-emerald-400 font-mono">SECURE v2.4</span>
+            </div>
+            <button onclick="generateExtraBatch()" class="w-full py-2 px-3 rounded-lg bg-[#1E293B] hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center justify-center gap-2 transition-colors border border-slate-700">
+                <i class="fa-solid fa-plus text-emerald-400"></i>
+                <span>Generate 5 Events</span>
+            </button>
+            <button onclick="resetDemoData()" class="w-full py-2 px-3 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-medium flex items-center justify-center gap-2 transition-colors border border-rose-500/20">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Reset Demo Data</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ================= MAIN CONTENT AREA ================= -->
+    <main class="flex-1 flex flex-col h-screen overflow-y-auto bg-darkbg">
+        
+        <!-- Top Header Bar -->
+        <header class="h-16 border-b border-[#1E293B] bg-[#0C1220]/80 backdrop-blur-md px-8 flex items-center justify-between sticky top-0 z-30">
+            <div class="flex items-center gap-4">
+                <h2 id="header-title" class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    System Overview & Metrics
+                </h2>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 bg-[#090D16] border border-[#1E293B] px-3 py-1.5 rounded-lg text-xs font-mono text-slate-300">
+                    <i class="fa-solid fa-lock text-emerald-400"></i>
+                    <span>IDEMPOTENCY GUARD ACTIVE</span>
+                </div>
+                <div class="flex items-center gap-2 bg-[#090D16] border border-[#1E293B] px-3 py-1.5 rounded-lg text-xs font-mono text-emerald-400">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>LIVE SYSTEM</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- View Containers -->
+        <div class="p-8 max-w-7xl w-full mx-auto flex-1">
+
+            <!-- ================= VIEW 1: OVERVIEW ================= -->
+            <section id="view-overview" class="tab-view space-y-8">
+                <!-- Metric Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="p-5 rounded-2xl border border-[#1E293B] bg-cardbg backdrop-blur-sm flex flex-col justify-between shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-slate-400">Total Transactions</span>
+                            <div class="p-2 rounded-xl bg-[#090D16] border border-[#1E293B] text-slate-300"><i class="fa-solid fa-database text-xs"></i></div>
+                        </div>
+                        <div>
+                            <div id="metric-total" class="text-3xl font-bold tracking-tight text-slate-100 font-mono">0</div>
+                            <span class="text-[11px] text-slate-500 mt-1 block font-medium">+12.5% vs last hour</span>
+                        </div>
+                    </div>
+                    <div class="p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 backdrop-blur-sm flex flex-col justify-between shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-slate-400">Successful</span>
+                            <div class="p-2 rounded-xl bg-[#090D16] border border-[#1E293B] text-emerald-400"><i class="fa-solid fa-circle-check text-xs"></i></div>
+                        </div>
+                        <div>
+                            <div id="metric-successful" class="text-3xl font-bold tracking-tight text-emerald-400 font-mono">0</div>
+                            <span class="text-[11px] text-slate-500 mt-1 block font-medium">Optimal throughput</span>
+                        </div>
+                    </div>
+                    <div class="p-5 rounded-2xl border border-rose-500/30 bg-rose-500/5 backdrop-blur-sm flex flex-col justify-between shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-slate-400">Failed / Drops</span>
+                            <div class="p-2 rounded-xl bg-[#090D16] border border-[#1E293B] text-rose-400"><i class="fa-solid fa-circle-xmark text-xs"></i></div>
+                        </div>
+                        <div>
+                            <div id="metric-failed" class="text-3xl font-bold tracking-tight text-rose-400 font-mono">0</div>
+                            <span class="text-[11px] text-slate-500 mt-1 block font-medium">Requires review</span>
+                        </div>
+                    </div>
+                    <div class="p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 backdrop-blur-sm flex flex-col justify-between shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-slate-400">Timeouts / Unknown</span>
+                            <div class="p-2 rounded-xl bg-[#090D16] border border-[#1E293B] text-amber-400"><i class="fa-solid fa-clock text-xs"></i></div>
+                        </div>
+                        <div>
+                            <div id="metric-timeouts" class="text-3xl font-bold tracking-tight text-amber-400 font-mono">0</div>
+                            <span class="text-[11px] text-slate-500 mt-1 block font-medium">Safe Guarded</span>
+                        </div>
+                    </div>
+                    <div class="p-5 rounded-2xl border border-teal-500/30 bg-teal-500/5 backdrop-blur-sm flex flex-col justify-between shadow-xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-slate-400">Success Rate</span>
+                            <div class="p-2 rounded-xl bg-[#090D16] border border-[#1E293B] text-teal-400"><i class="fa-solid fa-bolt text-xs"></i></div>
+                        </div>
+                        <div>
+                            <div id="metric-rate" class="text-3xl font-bold tracking-tight text-teal-400 font-mono">0.0%</div>
+                            <span class="text-[11px] text-slate-500 mt-1 block font-medium">Target &gt; 98%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl flex flex-col">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-200">Transaction Volume Activity</h3>
+                                <p class="text-xs text-slate-400">Real-time throughput and success trends</p>
+                            </div>
+                        </div>
+                        <div class="h-72 w-full relative">
+                            <canvas id="volumeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-200">Status Distribution</h3>
+                            <p class="text-xs text-slate-400">Aggregate outcomes breakdown</p>
+                        </div>
+                        <div class="h-56 w-full relative flex items-center justify-center my-2">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-[#1E293B]">
+                            <div class="text-center"><div class="text-[10px] text-slate-400">Success</div><div id="dist-success" class="text-sm font-bold font-mono text-emerald-400">0</div></div>
+                            <div class="text-center"><div class="text-[10px] text-slate-400">Failed</div><div id="dist-failed" class="text-sm font-bold font-mono text-rose-400">0</div></div>
+                            <div class="text-center"><div class="text-[10px] text-slate-400">Timeout</div><div id="dist-timeout" class="text-sm font-bold font-mono text-amber-400">0</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Preview Table -->
+                <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-200">Recent Transaction Activity</h3>
+                            <p class="text-xs text-slate-400">Latest simulated transaction logs</p>
+                        </div>
+                        <button onclick="switchTab('transactions')" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1">
+                            View All <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-[#1E293B] text-xs font-mono text-slate-400 uppercase">
+                                    <th class="pb-3 font-medium">Tx ID</th>
+                                    <th class="pb-3 font-medium">Customer</th>
+                                    <th class="pb-3 font-medium">Product</th>
+                                    <th class="pb-3 font-medium">Amount</th>
+                                    <th class="pb-3 font-medium">Scenario</th>
+                                    <th class="pb-3 font-medium">Status</th>
+                                    <th class="pb-3 font-medium">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="overview-recent-tbody" class="divide-y divide-[#1E293B]/60 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW 2: SIMULATOR ================= -->
+            <section id="view-simulator" class="tab-view hidden space-y-8">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Control Panel -->
+                    <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl space-y-6 lg:col-span-1">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-200">Simulation Control Panel</h3>
+                            <p class="text-xs text-slate-400">Configure parameters & inject failure scenarios</p>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Failure Scenario</label>
+                                <select id="sim-scenario" onchange="updateScenarioDesc()" class="w-full bg-[#090D16] border border-[#1E293B] rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                                    <option value="NORMAL">NORMAL (Optimal Flow)</option>
+                                    <option value="PAYMENT_TIMEOUT" selected>PAYMENT_TIMEOUT (Gateway Hang / Unknown)</option>
+                                    <option value="PAYMENT_UNAVAILABLE">PAYMENT_UNAVAILABLE (HTTP 503 Outage)</option>
+                                    <option value="HIGH_LATENCY">HIGH_LATENCY (Severe Delay)</option>
+                                    <option value="INTERMITTENT_FAILURE">INTERMITTENT_FAILURE (ECONNRESET Drop)</option>
+                                </select>
+                                <p id="scenario-desc-box" class="text-[11px] text-slate-400 mt-1.5 italic bg-[#090D16]/50 p-2 rounded-lg border border-[#1E293B]">
+                                    Gateway unresponsive after 5,000ms. Payment status defaults to UNKNOWN for safety.
+                                </p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Transaction Amount ($)</label>
+                                <input type="number" id="sim-amount" value="1499" class="w-full bg-[#090D16] border border-[#1E293B] rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Customer ID</label>
+                                <select id="sim-customer" class="w-full bg-[#090D16] border border-[#1E293B] rounded-xl px-3 py-2.5 text-sm text-slate-200 font-mono focus:outline-none focus:border-emerald-500">
+                                    <option value="CUST-1042">CUST-1042</option>
+                                    <option value="CUST-8831">CUST-8831</option>
+                                    <option value="CUST-2910">CUST-2910</option>
+                                    <option value="CUST-5542">CUST-5542</option>
+                                    <option value="CUST-9912">CUST-9912</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Product Name</label>
+                                <select id="sim-product" class="w-full bg-[#090D16] border border-[#1E293B] rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                                    <option value="Enterprise Cloud Cluster (1-Year)">Enterprise Cloud Cluster (1-Year)</option>
+                                    <option value="AI GPU Compute Node v2">AI GPU Compute Node v2</option>
+                                    <option value="Dedicated DB Instance 64GB">Dedicated DB Instance 64GB</option>
+                                    <option value="Global CDN Bandwidth Pack 10TB">Global CDN Bandwidth Pack 10TB</option>
+                                    <option value="Cybersecurity Sentinel Suite">Cybersecurity Sentinel Suite</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="run-sim-btn" onclick="startSimulation()" class="w-full py-3.5 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-black shadow-lg shadow-emerald-500/20 transition-all">
+                            <i class="fa-solid fa-play"></i>
+                            <span>Run Simulation</span>
+                        </button>
+                    </div>
+
+                    <!-- Workflow & Audit Trail -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 class="text-base font-semibold text-slate-200">Real-Time Transaction Workflow</h3>
+                                    <p class="text-xs text-slate-400">Step-by-step sequential execution monitor</p>
+                                </div>
+                                <div id="sim-header-badge" class="hidden items-center gap-3">
+                                    <span class="text-xs font-mono text-slate-400">ID: <strong id="sim-current-id" class="text-emerald-400">---</strong></span>
+                                    <span id="sim-status-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-sky-500/10 text-sky-400 border border-sky-500/30">PROCESSING</span>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-3" id="workflow-steps-container">
+                                <!-- Steps populated by JS -->
+                                <div class="p-4 rounded-xl border border-[#1E293B] bg-[#090D16] flex flex-col justify-between opacity-60">
+                                    <div class="flex items-center justify-between mb-2"><span class="text-[10px] font-mono text-slate-500">STEP 1</span></div>
+                                    <h4 class="text-xs font-bold text-slate-400 mb-1">LOGIN</h4>
+                                    <div class="text-[11px] font-mono text-slate-600">Pending</div>
+                                </div>
+                                <div class="p-4 rounded-xl border border-[#1E293B] bg-[#090D16] flex flex-col justify-between opacity-60">
+                                    <div class="flex items-center justify-between mb-2"><span class="text-[10px] font-mono text-slate-500">STEP 2</span></div>
+                                    <h4 class="text-xs font-bold text-slate-400 mb-1">PRODUCT_SELECTION</h4>
+                                    <div class="text-[11px] font-mono text-slate-600">Pending</div>
+                                </div>
+                                <div class="p-4 rounded-xl border border-[#1E293B] bg-[#090D16] flex flex-col justify-between opacity-60">
+                                    <div class="flex items-center justify-between mb-2"><span class="text-[10px] font-mono text-slate-500">STEP 3</span></div>
+                                    <h4 class="text-xs font-bold text-slate-400 mb-1">ADD_TO_CART</h4>
+                                    <div class="text-[11px] font-mono text-slate-600">Pending</div>
+                                </div>
+                                <div class="p-4 rounded-xl border border-[#1E293B] bg-[#090D16] flex flex-col justify-between opacity-60">
+                                    <div class="flex items-center justify-between mb-2"><span class="text-[10px] font-mono text-slate-500">STEP 4</span></div>
+                                    <h4 class="text-xs font-bold text-slate-400 mb-1">PAYMENT_PROCESSING</h4>
+                                    <div class="text-[11px] font-mono text-slate-600">Pending</div>
+                                </div>
+                                <div class="p-4 rounded-xl border border-[#1E293B] bg-[#090D16] flex flex-col justify-between opacity-60">
+                                    <div class="flex items-center justify-between mb-2"><span class="text-[10px] font-mono text-slate-500">STEP 5</span></div>
+                                    <h4 class="text-xs font-bold text-slate-400 mb-1">ORDER_CONFIRMATION</h4>
+                                    <div class="text-[11px] font-mono text-slate-600">Pending</div>
+                                </div>
+                            </div>
+                            <div class="p-4 rounded-xl bg-[#090D16] border border-[#1E293B] flex items-start gap-3 mt-4">
+                                <i class="fa-solid fa-shield-halved text-emerald-400 mt-0.5"></i>
+                                <div class="text-xs space-y-1 text-slate-300">
+                                    <p class="font-semibold text-slate-200">Safety & Idempotency Rules Enforced:</p>
+                                    <ul class="list-disc pl-4 space-y-0.5 text-slate-400">
+                                        <li>Payment timeouts result in <strong class="text-amber-400">UNKNOWN</strong> status rather than auto-fail.</li>
+                                        <li>Idempotency keys prevent duplicate payments across retries.</li>
+                                        <li>Ledger verification required prior to recovery execution.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                                    <i class="fa-solid fa-terminal text-emerald-400"></i>
+                                    Audit Trail & System Logs
+                                </h3>
+                                <span id="audit-tx-id" class="text-xs font-mono text-slate-500">---</span>
+                            </div>
+                            <div id="audit-logs-box" class="bg-black/80 rounded-xl p-4 font-mono text-xs text-emerald-400/90 space-y-1.5 max-h-48 overflow-y-auto border border-[#1E293B]">
+                                <div class="text-slate-600">&gt; System initialized. Ready for simulation execution...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW 3: LIVE TRANSACTIONS ================= -->
+            <section id="view-transactions" class="tab-view hidden space-y-6">
+                <div class="p-4 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="relative w-full md:w-96">
+                        <i class="fa-solid fa-search text-slate-500 absolute left-3.5 top-3.5"></i>
+                        <input type="text" id="tx-search" oninput="renderTransactionsTable()" placeholder="Search by Tx ID, Customer ID, or Product..." class="w-full bg-[#090D16] border border-[#1E293B] rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div class="flex items-center gap-3 w-full md:w-auto">
+                        <div class="flex items-center gap-2 bg-[#090D16] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-slate-300">
+                            <i class="fa-solid fa-filter text-emerald-400"></i>
+                            <span>Scenario:</span>
+                            <select id="tx-scenario-filter" onchange="renderTransactionsTable()" class="bg-transparent text-slate-200 focus:outline-none font-medium">
+                                <option value="ALL">All Scenarios</option>
+                                <option value="NORMAL">NORMAL</option>
+                                <option value="PAYMENT_TIMEOUT">PAYMENT_TIMEOUT</option>
+                                <option value="PAYMENT_UNAVAILABLE">PAYMENT_UNAVAILABLE</option>
+                                <option value="HIGH_LATENCY">HIGH_LATENCY</option>
+                                <option value="INTERMITTENT_FAILURE">INTERMITTENT_FAILURE</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-200">Transaction Ledger</h3>
+                            <p class="text-xs text-slate-400" id="tx-count-sub">Showing all records</p>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-[#1E293B] text-xs font-mono text-slate-400 uppercase">
+                                    <th class="pb-3 font-medium">Transaction ID</th>
+                                    <th class="pb-3 font-medium">Customer ID</th>
+                                    <th class="pb-3 font-medium">Product</th>
+                                    <th class="pb-3 font-medium">Amount</th>
+                                    <th class="pb-3 font-medium">Scenario</th>
+                                    <th class="pb-3 font-medium">Status</th>
+                                    <th class="pb-3 font-medium">Processing Time</th>
+                                    <th class="pb-3 font-medium">Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody id="live-tx-tbody" class="divide-y divide-[#1E293B]/60 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW 4: INCIDENTS ================= -->
+            <section id="view-incidents" class="tab-view hidden space-y-6">
+                <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-200">Detected System Incidents</h3>
+                            <p class="text-xs text-slate-400">Automatic failure detection & rule-based diagnostics</p>
+                        </div>
+                        <span id="active-incidents-badge" class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">0 Active</span>
+                    </div>
+                    <div id="incidents-container" class="space-y-4"></div>
+                </div>
+            </section>
+
+            <!-- ================= VIEW 5: RECOVERY CENTER ================= -->
+            <section id="view-recovery" class="tab-view hidden space-y-6">
+                <div class="p-6 rounded-2xl bg-cardbg border border-[#1E293B] shadow-xl">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-base font-semibold text-slate-200">Transaction Recovery Center</h3>
+                            <p class="text-xs text-slate-400">Administrator approval required before executing safe recovery actions</p>
+                        </div>
+                        <span id="pending-recoveries-badge" class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">0 Pending</span>
+                    </div>
+                    <div id="recoveries-container" class="space-y-4"></div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- AI Investigation Modal -->
+    <div id="ai-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-cardbg border border-[#1E293B] rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-6">
+            <div class="flex items-center justify-between border-b border-[#1E293B] pb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-microchip text-emerald-400"></i>
+                        Rule-Based AI Investigation Report
+                    </h3>
+                    <p class="text-xs text-slate-400" id="ai-modal-subtitle">Diagnostic analysis for Incident</p>
+                </div>
+                <button onclick="closeAiModal()" class="p-2 rounded-lg bg-[#1E293B] hover:bg-slate-700 text-slate-300">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-4 text-sm">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl bg-[#090D16] border border-[#1E293B]">
+                        <span class="text-xs text-slate-400 block mb-1">Root Cause</span>
+                        <strong id="ai-modal-cause" class="text-slate-200">---</strong>
+                    </div>
+                    <div class="p-4 rounded-xl bg-[#090D16] border border-[#1E293B]">
+                        <span class="text-xs text-slate-400 block mb-1">Confidence Score</span>
+                        <strong id="ai-modal-conf" class="text-emerald-400 font-mono text-lg">95%</strong>
+                    </div>
+                </div>
+                <div class="p-4 rounded-xl bg-[#090D16] border border-[#1E293B]">
+                    <span class="text-xs text-slate-400 block mb-1">Business Impact</span>
+                    <p id="ai-modal-impact" class="text-slate-300">---</p>
+                </div>
+                <div class="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/30">
+                    <span class="text-xs font-semibold text-emerald-400 block mb-1">Recommended Action</span>
+                    <p id="ai-modal-action" class="text-slate-200">---</p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t border-[#1E293B]">
+                <button onclick="closeAiModal()" class="py-2.5 px-5 rounded-xl bg-[#1E293B] hover:bg-slate-700 text-slate-200 text-xs font-medium">Close Report</button>
+                <button onclick="gotoRecoveryFromModal()" class="py-2.5 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold shadow-lg shadow-emerald-500/20">Proceed to Recovery Center</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // Constants & Storage Keys
+        const STORAGE_KEYS = {
+            TXS: 'sentinelflow_txs_v1',
+            INCIDENTS: 'sentinelflow_incidents_v1',
+            RECOVERIES: 'sentinelflow_recoveries_v1'
+        };
+
+        const SCENARIO_DESCRIPTIONS = {
+            NORMAL: 'Standard transaction flow with all systems operating at optimal latency (<150ms).',
+            PAYMENT_TIMEOUT: 'Gateway unresponsive after 5,000ms. Payment status defaults to UNKNOWN for safety.',
+            PAYMENT_UNAVAILABLE: 'Payment gateway returns HTTP 503 Service Unavailable immediately.',
+            HIGH_LATENCY: 'Severe network degradation causing step processing delays up to 3,000ms per step.',
+            INTERMITTENT_FAILURE: 'Random packet drops causing mid-workflow failure at payment processing.'
+        };
+
+        const INITIAL_CUSTOMERS = ['CUST-1042', 'CUST-8831', 'CUST-2910', 'CUST-5542', 'CUST-9912'];
+        const INITIAL_PRODUCTS = [
+            'Enterprise Cloud Cluster (1-Year)', 
+            'AI GPU Compute Node v2', 
+            'Dedicated DB Instance 64GB', 
+            'Global CDN Bandwidth Pack 10TB', 
+            'Cybersecurity Sentinel Suite'
+        ];
+
+        // Global State
+        let transactions = [];
+        let incidents = [];
+        let recoveries = [];
+        let activeSimTx = null;
+        let volumeChartInstance = null;
+        let statusChartInstance = null;
+        let selectedIncidentForModal = null;
+
+        // Notification Toast
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-emerald-950/95 border-emerald-500/50 text-emerald-300' :
+                            type === 'error' ? 'bg-rose-950/95 border-rose-500/50 text-rose-300' :
+                            'bg-slate-900/95 border-slate-700 text-slate-200';
+            const icon = type === 'success' ? 'fa-circle-check text-emerald-400' :
+                         type === 'error' ? 'fa-triangle-exclamation text-rose-400' :
+                         'fa-circle-info text-sky-400';
+
+            toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-md pointer-events-auto transition-all transform translate-y-2 opacity-0 ${bgClass}`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-lg"></i><span class="text-sm font-medium">${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 10);
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Initialize Synthetic Data
+        function createSyntheticDataset() {
+            const scenarios = ['NORMAL', 'PAYMENT_TIMEOUT', 'PAYMENT_UNAVAILABLE', 'HIGH_LATENCY', 'INTERMITTENT_FAILURE'];
+            const txs = [];
+            const incs = [];
+            const recs = [];
+
+            for (let i = 1; i <= 20; i++) {
+                const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+                const id = `TX-${1000 + i}`;
+                const custId = INITIAL_CUSTOMERS[Math.floor(Math.random() * INITIAL_CUSTOMERS.length)];
+                const product = INITIAL_PRODUCTS[Math.floor(Math.random() * INITIAL_PRODUCTS.length)];
+                const amount = Math.floor(Math.random() * 9500) + 499;
+                const idempotencyKey = `idemp-${Math.random().toString(36).substring(2, 12)}`;
+                const timestamp = new Date(Date.now() - (21 - i) * 1000 * 60 * 15).toISOString();
+
+                let status = 'SUCCESS';
+                let processingTime = 420;
+                const auditTrail = [`[${timestamp}] Transaction initiated via API gateway. Idempotency Key: ${idempotencyKey}`];
+
+                const steps = [
+                    { name: 'LOGIN', status: 'SUCCESS', timestamp, durationMs: 45 },
+                    { name: 'PRODUCT_SELECTION', status: 'SUCCESS', timestamp, durationMs: 80 },
+                    { name: 'ADD_TO_CART', status: 'SUCCESS', timestamp, durationMs: 65 },
+                ];
+
+                if (scenario === 'NORMAL') {
+                    steps.push({ name: 'PAYMENT_PROCESSING', status: 'SUCCESS', timestamp, durationMs: 180 });
+                    steps.push({ name: 'ORDER_CONFIRMATION', status: 'SUCCESS', timestamp, durationMs: 50 });
+                    processingTime = 420;
+                    auditTrail.push(`[${timestamp}] Payment successfully processed and captured.`);
+                } else if (scenario === 'PAYMENT_TIMEOUT') {
+                    status = 'TIMEOUT';
+                    steps.push({ name: 'PAYMENT_PROCESSING', status: 'UNKNOWN', timestamp, durationMs: 5000, error: 'Gateway timeout reached (5000ms). Status UNKNOWN.' });
+                    steps.push({ name: 'ORDER_CONFIRMATION', status: 'SKIPPED', timestamp, durationMs: 0 });
+                    processingTime = 5125;
+                    auditTrail.push(`[${timestamp}] WARNING: Gateway timeout. Status marked UNKNOWN to prevent duplicate charging.`);
+
+                    const incId = `INC-${2000 + i}`;
+                    incs.push({
+                        id: incId,
+                        transactionId: id,
+                        severity: 'HIGH',
+                        rootCause: 'Gateway Timeout / Connection Dropped',
+                        status: 'OPEN',
+                        recommendedAction: 'Verify payment status with gateway using idempotency key before initiating retry.',
+                        confidenceScore: 0.94,
+                        businessImpact: 'Customer cart locked in pending verification state. Potential lost conversion.',
+                        timestamp
+                    });
+
+                    recs.push({
+                        id: `REC-${3000 + i}`,
+                        incidentId: incId,
+                        transactionId: id,
+                        actionType: 'VERIFY_AND_RETRY',
+                        description: `Verify transaction ${id} ledger state with acquirer before releasing lock.`,
+                        requiresApproval: true,
+                        approved: false,
+                        executed: false,
+                        timestamp
+                    });
+                } else if (scenario === 'PAYMENT_UNAVAILABLE') {
+                    status = 'FAILED';
+                    steps.push({ name: 'PAYMENT_PROCESSING', status: 'FAILED', timestamp, durationMs: 120, error: 'HTTP 503 Service Unavailable' });
+                    steps.push({ name: 'ORDER_CONFIRMATION', status: 'SKIPPED', timestamp, durationMs: 0 });
+                    processingTime = 345;
+                    auditTrail.push(`[${timestamp}] CRITICAL: Payment service returned 503 Unavailable.`);
+
+                    const incId = `INC-${2000 + i}`;
+                    incs.push({
+                        id: incId,
+                        transactionId: id,
+                        severity: 'CRITICAL',
+                        rootCause: 'Payment Gateway Down (503 Service Unavailable)',
+                        status: 'OPEN',
+                        recommendedAction: 'Route traffic to secondary acquirer endpoint and execute idempotent retry.',
+                        confidenceScore: 0.98,
+                        businessImpact: 'Immediate checkout outage for all users hitting primary pool.',
+                        timestamp
+                    });
+
+                    recs.push({
+                        id: `REC-${3000 + i}`,
+                        incidentId: incId,
+                        transactionId: id,
+                        actionType: 'IDEMPOTENT_REFUND_OR_COMPLETE',
+                        description: `Failover to backup PSP using idempotency key ${idempotencyKey}.`,
+                        requiresApproval: true,
+                        approved: false,
+                        executed: false,
+                        timestamp
+                    });
+                } else if (scenario === 'HIGH_LATENCY') {
+                    status = 'SUCCESS';
+                    steps.push({ name: 'PAYMENT_PROCESSING', status: 'SUCCESS', timestamp, durationMs: 3400 });
+                    steps.push({ name: 'ORDER_CONFIRMATION', status: 'SUCCESS', timestamp, durationMs: 820 });
+                    processingTime = 4345;
+                    auditTrail.push(`[${timestamp}] High latency detected across downstream services. Transaction completed successfully.`);
+                } else {
+                    status = 'FAILED';
+                    steps.push({ name: 'PAYMENT_PROCESSING', status: 'FAILED', timestamp, durationMs: 410, error: 'Connection reset by peer (ECONNRESET)' });
+                    steps.push({ name: 'ORDER_CONFIRMATION', status: 'SKIPPED', timestamp, durationMs: 0 });
+                    processingTime = 890;
+                    auditTrail.push(`[${timestamp}] Payment dropped mid-stream due to transient network reset.`);
+
+                    const incId = `INC-${2000 + i}`;
+                    incs.push({
+                        id: incId,
+                        transactionId: id,
+                        severity: 'MEDIUM',
+                        rootCause: 'Intermittent Packet Loss / ECONNRESET',
+                        status: 'OPEN',
+                        recommendedAction: 'Safe automatic retry with exponential backoff using idempotency lock.',
+                        confidenceScore: 0.89,
+                        businessImpact: 'Transient checkout failure. Minor customer friction.',
+                        timestamp
+                    });
+
+                    recs.push({
+                        id: `REC-${3000 + i}`,
+                        incidentId: incId,
+                        transactionId: id,
+                        actionType: 'VERIFY_AND_RETRY',
+                        description: `Confirm zero charge on ledger, then execute automated retry for ${id}.`,
+                        requiresApproval: false,
+                        approved: true,
+                        executed: false,
+                        timestamp
+                    });
+                }
+
+                txs.push({
+                    id,
+                    customerId: custId,
+                    amount,
+                    productName: product,
+                    scenario,
+                    status,
+                    processingTime,
+                    timestamp,
+                    steps,
+                    idempotencyKey,
+                    paymentVerified: status === 'SUCCESS',
+                    auditTrail
+                });
+            }
+
+            return { txs, incs, recs };
+        }
+
+        // Load Data from LocalStorage or Initialize
+        function loadData() {
+            try {
+                const savedTxs = localStorage.getItem(STORAGE_KEYS.TXS);
+                const savedIncs = localStorage.getItem(STORAGE_KEYS.INCIDENTS);
+                const savedRecs = localStorage.getItem(STORAGE_KEYS.RECOVERIES);
+
+                if (savedTxs && savedIncs && savedRecs) {
+                    transactions = JSON.parse(savedTxs);
+                    incidents = JSON.parse(savedIncs);
+                    recoveries = JSON.parse(savedRecs);
+                } else {
+                    const fresh = createSyntheticDataset();
+                    transactions = fresh.txs;
+                    incidents = fresh.incs;
+                    recoveries = fresh.recs;
+                    persistData();
+                }
+            } catch (e) {
+                console.error(e);
+                const fresh = createSyntheticDataset();
+                transactions = fresh.txs;
+                incidents = fresh.incs;
+                recoveries = fresh.recs;
+            }
+        }
+
+        function persistData() {
+            localStorage.setItem(STORAGE_KEYS.TXS, JSON.stringify(transactions));
+            localStorage.setItem(STORAGE_KEYS.INCIDENTS, JSON.stringify(incidents));
+            localStorage.setItem(STORAGE_KEYS.RECOVERIES, JSON.stringify(recoveries));
+        }
+
+        function resetDemoData() {
+            const fresh = createSyntheticDataset();
+            transactions = fresh.txs;
+            incidents = fresh.incs;
+            recoveries = fresh.recs;
+            persistData();
+            refreshAllViews();
+            showToast('Demo environment reset with 20 synthetic transactions.', 'success');
+        }
+
+        function generateExtraBatch() {
+            const fresh = createSyntheticDataset();
+            transactions = [...fresh.txs.slice(0, 5), ...transactions];
+            incidents = [...fresh.incs.slice(0, 2), ...incidents];
+            recoveries = [...fresh.recs.slice(0, 2), ...recoveries];
+            persistData();
+            refreshAllViews();
+            showToast('Generated 5 new synthetic transaction events.', 'success');
+        }
+
+        // Tab Navigation Switcher
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className = "nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/50 border border-transparent";
+                const icon = btn.querySelector('i');
+                if (icon) icon.className = icon.className.replace('text-emerald-400', 'text-slate-500');
+            });
+
+            const activeBtn = document.querySelector(`[data-tab="${tabId}"]`);
+            if (activeBtn) {
+                activeBtn.className = "nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm";
+                const icon = activeBtn.querySelector('i');
+                if (icon) icon.className = icon.className.replace('text-slate-500', 'text-emerald-400');
+            }
+
+            const titles = {
+                overview: 'System Overview & Metrics',
+                simulator: 'Transaction Workflow Simulator',
+                transactions: 'Live Transaction Ledger',
+                incidents: 'Incident Detection & AI Investigation',
+                recovery: 'Safety & Recovery Center'
+            };
+            document.getElementById('header-title').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>${titles[tabId]}`;
+
+            refreshAllViews();
+        }
+
+        function refreshAllViews() {
+            updateBadges();
+            renderOverview();
+            renderTransactionsTable();
+            renderIncidents();
+            renderRecoveries();
+        }
+
+        function updateBadges() {
+            document.getElementById('badge-txs').innerText = transactions.length;
+            const activeIncs = incidents.filter(i => i.status !== 'RESOLVED').length;
+            document.getElementById('badge-incidents').innerText = activeIncs;
+            const pendingRecs = recoveries.filter(r => !r.executed).length;
+            document.getElementById('badge-recoveries').innerText = pendingRecs;
+        }
+
+        // ================= OVERVIEW VIEW =================
+        function renderOverview() {
+            const total = transactions.length;
+            const successful = transactions.filter(t => t.status === 'SUCCESS').length;
+            const failed = transactions.filter(t => t.status === 'FAILED').length;
+            const timeouts = transactions.filter(t => t.status === 'TIMEOUT').length;
+            const activeIncs = incidents.filter(i => i.status !== 'RESOLVED').length;
+            const successRate = total > 0 ? ((successful / total) * 100).toFixed(1) : '0.0';
+
+            document.getElementById('metric-total').innerText = total;
+            document.getElementById('metric-successful').innerText = successful;
+            document.getElementById('metric-failed').innerText = failed;
+            document.getElementById('metric-timeouts').innerText = timeouts;
+            document.getElementById('metric-rate').innerText = `${successRate}%`;
+
+            document.getElementById('dist-success').innerText = successful;
+            document.getElementById('dist-failed').innerText = failed;
+            document.getElementById('dist-timeout').innerText = timeouts;
+
+            // Recent table
+            const tbody = document.getElementById('overview-recent-tbody');
+            tbody.innerHTML = transactions.slice(0, 5).map(tx => `
+                <tr class="hover:bg-[#1E293B]/40 transition-colors">
+                    <td class="py-3 font-mono text-xs font-bold text-emerald-400">${tx.id}</td>
+                    <td class="py-3 text-slate-300">${tx.customerId}</td>
+                    <td class="py-3 text-slate-300 truncate max-w-[200px]">${tx.productName}</td>
+                    <td class="py-3 font-mono font-medium text-slate-100">$${tx.amount.toLocaleString()}</td>
+                    <td class="py-3"><span class="px-2.5 py-1 rounded-md text-[10px] font-mono font-semibold bg-[#090D16] border border-[#1E293B] text-slate-300">${tx.scenario}</span></td>
+                    <td class="py-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${tx.status === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : tx.status === 'TIMEOUT' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'}">${tx.status}</span></td>
+                    <td class="py-3 text-xs text-slate-500 font-mono">${new Date(tx.timestamp).toLocaleTimeString()}</td>
+                </tr>
+            `).join('');
+
+            renderCharts(successful, failed, timeouts);
+        }
+
+        function renderCharts(succ, fail, time) {
+            // Volume Chart
+            const ctxVol = document.getElementById('volumeChart').getContext('2d');
+            if (volumeChartInstance) volumeChartInstance.destroy();
+
+            const timeMap = {};
+            transactions.slice().reverse().forEach(t => {
+                const tm = new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                if (!timeMap[tm]) timeMap[tm] = { s: 0, f: 0 };
+                if (t.status === 'SUCCESS') timeMap[tm].s++; else timeMap[tm].f++;
+            });
+            const labels = Object.keys(timeMap);
+            const successData = labels.map(l => timeMap[l].s);
+            const failedData = labels.map(l => timeMap[l].f);
+
+            volumeChartInstance = new Chart(ctxVol, {
+                type: 'line',
+                data: {
+                    labels: labels.length ? labels : ['10:00', '10:15', '10:30', '10:45'],
+                    datasets: [
+                        { label: 'Successful', data: successData.length ? successData : [5, 8, 12, 15], borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.3 },
+                        { label: 'Failed', data: failedData.length ? failedData : [1, 2, 0, 1], borderColor: '#EF4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#1E293B' }, ticks: { color: '#64748B', font: { size: 10 } } },
+                        y: { grid: { color: '#1E293B' }, ticks: { color: '#64748B', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Status Distribution Chart
+            const ctxStatus = document.getElementById('statusChart').getContext('2d');
+            if (statusChartInstance) statusChartInstance.destroy();
+
+            statusChartInstance = new Chart(ctxStatus, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Successful', 'Failed', 'Timeout'],
+                    datasets: [{
+                        data: [succ, fail, time],
+                        backgroundColor: ['#10B981', '#EF4444', '#F59E0B'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // ================= SIMULATOR VIEW =================
+        function updateScenarioDesc() {
+            const sc = document.getElementById('sim-scenario').value;
+            document.getElementById('scenario-desc-box').innerText = SCENARIO_DESCRIPTIONS[sc];
+        }
+
+        function startSimulation() {
+            const scenario = document.getElementById('sim-scenario').value;
+            const amount = Number(document.getElementById('sim-amount').value);
+            const customerId = document.getElementById('sim-customer').value;
+            const productName = document.getElementById('sim-product').value;
+            const txId = `TX-${Math.floor(10000 + Math.random() * 90000)}`;
+            const idempotencyKey = `idemp-${Math.random().toString(36).substring(2, 12)}`;
+            const nowIso = new Date().toISOString();
+
+            const steps = [
+                { name: 'LOGIN', status: 'PENDING', durationMs: 0 },
+                { name: 'PRODUCT_SELECTION', status: 'PENDING', durationMs: 0 },
+                { name: 'ADD_TO_CART', status: 'PENDING', durationMs: 0 },
+                { name: 'PAYMENT_PROCESSING', status: 'PENDING', durationMs: 0 },
+                { name: 'ORDER_CONFIRMATION', status: 'PENDING', durationMs: 0 },
+            ];
+
+            activeSimTx = {
+                id: txId,
+                customerId,
+                amount,
+                productName,
+                scenario,
+                status: 'PROCESSING',
+                processingTime: 0,
+                timestamp: nowIso,
+                steps,
+                idempotencyKey,
+                paymentVerified: false,
+                auditTrail: [`[${nowIso}] Simulation started. Scenario: ${scenario}. Idempotency Key: ${idempotencyKey}`]
+            };
+
+            document.getElementById('sim-header-badge').classList.remove('hidden');
+            document.getElementById('sim-header-badge').classList.add('flex');
+            document.getElementById('sim-current-id').innerText = txId;
+            document.getElementById('audit-tx-id').innerText = txId;
+            document.getElementById('run-sim-btn').disabled = true;
+            document.getElementById('run-sim-btn').classList.add('opacity-50', 'cursor-not-allowed');
+
+            renderWorkflowStepDOM(0, 'RUNNING');
+            addAuditLog(`[${new Date().toLocaleTimeString()}] Initializing transaction sequence...`);
+
+            // Step progression interval
+            let currentStepIdx = 0;
+            const stepInterval = setInterval(() => {
+                currentStepIdx++;
+                if (currentStepIdx < 5) {
+                    // Update previous step to SUCCESS
+                    activeSimTx.steps[currentStepIdx - 1].status = 'SUCCESS';
+                    activeSimTx.steps[currentStepIdx - 1].durationMs = Math.floor(Math.random() * 60) + 40;
+                    renderWorkflowStepDOM(currentStepIdx - 1, 'SUCCESS');
+
+                    if (currentStepIdx === 3) { // Payment Step
+                        if (scenario === 'NORMAL') {
+                            activeSimTx.steps[3].status = 'SUCCESS';
+                            activeSimTx.steps[3].durationMs = 210;
+                            activeSimTx.auditTrail.push(`Payment successfully authorized for $${amount}.`);
+                        } else if (scenario === 'PAYMENT_TIMEOUT') {
+                            activeSimTx.steps[3].status = 'UNKNOWN';
+                            activeSimTx.steps[3].durationMs = 5000;
+                            activeSimTx.steps[3].error = 'Gateway timeout reached (5000ms). Status UNKNOWN.';
+                            activeSimTx.auditTrail.push(`SAFETY PROTOCOL: Gateway timeout. Status marked UNKNOWN.`);
+                        } else if (scenario === 'PAYMENT_UNAVAILABLE') {
+                            activeSimTx.steps[3].status = 'FAILED';
+                            activeSimTx.steps[3].durationMs = 150;
+                            activeSimTx.steps[3].error = 'HTTP 503: Gateway cluster offline.';
+                            activeSimTx.auditTrail.push(`CRITICAL: Payment cluster unreachable. Gateway returned 503.`);
+                        } else if (scenario === 'HIGH_LATENCY') {
+                            activeSimTx.steps[3].status = 'SUCCESS';
+                            activeSimTx.steps[3].durationMs = 3800;
+                            activeSimTx.auditTrail.push(`High latency warning: Gateway took 3.8s to respond.`);
+                        } else {
+                            activeSimTx.steps[3].status = 'FAILED';
+                            activeSimTx.steps[3].durationMs = 320;
+                            activeSimTx.steps[3].error = 'ECONNRESET: Connection dropped.';
+                            activeSimTx.auditTrail.push(`ERROR: Intermittent connection reset during token exchange.`);
+                        }
+                    }
+                    renderWorkflowStepDOM(currentStepIdx, 'RUNNING');
+                    addAuditLog(`Executing step: ${activeSimTx.steps[currentStepIdx].name}`);
+                } else {
+                    clearInterval(stepInterval);
+                    // Finalize step 4
+                    const paymentStep = activeSimTx.steps[3];
+                    let finalStatus = 'SUCCESS';
+                    if (paymentStep.status === 'SUCCESS') {
+                        activeSimTx.steps[4].status = 'SUCCESS';
+                        activeSimTx.steps[4].durationMs = 45;
+                        finalStatus = 'SUCCESS';
+                        activeSimTx.paymentVerified = true;
+                    } else if (paymentStep.status === 'UNKNOWN') {
+                        activeSimTx.steps[4].status = 'SKIPPED';
+                        finalStatus = 'TIMEOUT';
+                        activeSimTx.paymentVerified = false;
+                    } else {
+                        activeSimTx.steps[4].status = 'SKIPPED';
+                        finalStatus = 'FAILED';
+                        activeSimTx.paymentVerified = false;
+                    }
+
+                    renderWorkflowStepDOM(4, activeSimTx.steps[4].status);
+
+                    const totalDuration = activeSimTx.steps.reduce((a, s) => a + s.durationMs, 0);
+                    activeSimTx.status = finalStatus;
+                    activeSimTx.processingTime = totalDuration;
+
+                    transactions.unshift(activeSimTx);
+
+                    if (finalStatus === 'TIMEOUT' || finalStatus === 'FAILED') {
+                        const incId = `INC-${Math.floor(1000 + Math.random() * 9000)}`;
+                        const rootCause = finalStatus === 'TIMEOUT' ? 'Gateway Timeout / State UNKNOWN' : (paymentStep.error || 'Payment Gateway Failure');
+                        const severity = finalStatus === 'TIMEOUT' ? 'HIGH' : 'CRITICAL';
+
+                        incidents.unshift({
+                            id: incId,
+                            transactionId: activeSimTx.id,
+                            severity,
+                            rootCause,
+                            status: 'OPEN',
+                            recommendedAction: finalStatus === 'TIMEOUT' ? 'Verify ledger state using idempotency key before attempting automated retry.' : 'Switch to backup payment processor endpoint and retry transaction.',
+                            confidenceScore: 0.95,
+                            businessImpact: `Transaction ${activeSimTx.id} ($${activeSimTx.amount}) impacted. Customer cart in hold state.`,
+                            timestamp: new Date().toISOString()
+                        });
+
+                        recoveries.unshift({
+                            id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
+                            incidentId: incId,
+                            transactionId: activeSimTx.id,
+                            actionType: finalStatus === 'TIMEOUT' ? 'VERIFY_AND_RETRY' : 'IDEMPOTENT_REFUND_OR_COMPLETE',
+                            description: `Safe recovery workflow for ${activeSimTx.id} using Idempotency Key: ${activeSimTx.idempotencyKey}`,
+                            requiresApproval: true,
+                            approved: false,
+                            executed: false,
+                            timestamp: new Date().toISOString()
+                        });
+
+                        showToast(`Incident ${incId} automatically generated for transaction ${activeSimTx.id}`, 'error');
+                    } else {
+                        showToast(`Transaction ${activeSimTx.id} completed successfully!`, 'success');
+                    }
+
+                    persistData();
+                    refreshAllViews();
+
+                    document.getElementById('sim-status-badge').innerText = finalStatus;
+                    document.getElementById('sim-status-badge').className = `px-2.5 py-1 rounded-full text-xs font-mono font-bold ${finalStatus === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : finalStatus === 'TIMEOUT' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'}`;
+                    document.getElementById('run-sim-btn').disabled = false;
+                    document.getElementById('run-sim-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }, 700);
+        }
+
+        function renderWorkflowStepDOM(idx, status) {
+            const container = document.getElementById('workflow-steps-container');
+            const stepNames = ['LOGIN', 'PRODUCT_SELECTION', 'ADD_TO_CART', 'PAYMENT_PROCESSING', 'ORDER_CONFIRMATION'];
+            
+            let html = '';
+            for (let i = 0; i < 5; i++) {
+                const step = activeSimTx ? activeSimTx.steps[i] : null;
+                const st = step ? step.status : (i < idx ? 'SUCCESS' : i === idx ? status : 'PENDING');
+                const isDone = st === 'SUCCESS';
+                const isFailed = st === 'FAILED';
+                const isUnknown = st === 'UNKNOWN';
+                const isRunning = st === 'RUNNING';
+                const isSkipped = st === 'SKIPPED';
+
+                const borderClass = isDone ? 'bg-emerald-500/5 border-emerald-500/30' :
+                                    isFailed ? 'bg-rose-500/5 border-rose-500/30' :
+                                    isUnknown ? 'bg-amber-500/5 border-amber-500/30' :
+                                    isRunning ? 'bg-slate-900 border-sky-500 shadow-lg shadow-sky-500/10 animate-pulse' :
+                                    isSkipped ? 'bg-[#090D16] border-[#1E293B] opacity-40' : 'bg-[#090D16] border-[#1E293B] opacity-60';
+
+                html += `
+                    <div class="p-4 rounded-xl border ${borderClass} flex flex-col justify-between transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-[10px] font-mono font-bold text-slate-400">STEP ${i + 1}</span>
+                            ${isDone ? '<i class="fa-solid fa-circle-check text-emerald-400"></i>' :
+                              isFailed ? '<i class="fa-solid fa-circle-xmark text-rose-400"></i>' :
+                              isUnknown ? '<i class="fa-solid fa-triangle-exclamation text-amber-400"></i>' :
+                              isRunning ? '<i class="fa-solid fa-spinner fa-spin text-sky-400"></i>' :
+                              isSkipped ? '<span class="text-[10px] text-slate-500 font-mono">SKIP</span>' : '<i class="fa-solid fa-clock text-slate-600"></i>'}
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold text-slate-200 mb-1">${stepNames[i]}</h4>
+                            <div class="text-[11px] font-mono text-slate-400">${step && step.durationMs ? step.durationMs + 'ms' : '0ms'}</div>
+                        </div>
+                        ${step && step.error ? `<p class="text-[10px] text-rose-400 mt-2 font-mono bg-rose-950/40 p-1.5 rounded border border-rose-900/50">${step.error}</p>` : ''}
+                    </div>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        function addAuditLog(msg) {
+            const box = document.getElementById('audit-logs-box');
+            box.innerHTML += `<div><span class="text-slate-600">&gt;</span> ${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // ================= LIVE TRANSACTIONS VIEW =================
+        function renderTransactionsTable() {
+            const query = document.getElementById('tx-search').value.toLowerCase();
+            const scenarioFilter = document.getElementById('tx-scenario-filter').value;
+
+            const filtered = transactions.filter(t => {
+                const matchesSearch = t.id.toLowerCase().includes(query) || t.customerId.toLowerCase().includes(query) || t.productName.toLowerCase().includes(query);
+                const matchesScenario = scenarioFilter === 'ALL' || t.scenario === scenarioFilter;
+                return matchesSearch && matchesScenario;
+            });
+
+            document.getElementById('tx-count-sub').innerText = `Showing ${filtered.length} of ${transactions.length} records`;
+            const tbody = document.getElementById('live-tx-tbody');
+
+            tbody.innerHTML = filtered.map(tx => `
+                <tr class="hover:bg-[#1E293B]/40 transition-colors">
+                    <td class="py-3 font-mono text-xs font-bold text-emerald-400">${tx.id}</td>
+                    <td class="py-3 text-slate-300 font-mono text-xs">${tx.customerId}</td>
+                    <td class="py-3 text-slate-300 truncate max-w-[220px]">${tx.productName}</td>
+                    <td class="py-3 font-mono font-medium text-slate-100">$${tx.amount.toLocaleString()}</td>
+                    <td class="py-3"><span class="px-2.5 py-1 rounded-md text-[10px] font-mono font-semibold bg-[#090D16] border border-[#1E293B] text-slate-300">${tx.scenario}</span></td>
+                    <td class="py-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${tx.status === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : tx.status === 'TIMEOUT' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'}">${tx.status}</span></td>
+                    <td class="py-3 font-mono text-xs text-slate-400">${tx.processingTime}ms</td>
+                    <td class="py-3 text-xs text-slate-500 font-mono">${new Date(tx.timestamp).toLocaleTimeString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        // ================= INCIDENTS VIEW =================
+        function renderIncidents() {
+            const container = document.getElementById('incidents-container');
+            const activeCount = incidents.filter(i => i.status !== 'RESOLVED').length;
+            document.getElementById('active-incidents-badge').innerText = `${activeCount} Active`;
+
+            container.innerHTML = incidents.map(inc => `
+                <div class="p-5 rounded-xl bg-[#090D16]/60 border border-[#1E293B] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-3">
+                            <span class="font-mono font-bold text-sm text-rose-400">${inc.id}</span>
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${inc.severity === 'CRITICAL' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' : inc.severity === 'HIGH' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-sky-500/10 text-sky-400 border border-sky-500/30'}">${inc.severity}</span>
+                            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${inc.status === 'RESOLVED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}">${inc.status}</span>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-semibold text-slate-200">${inc.rootCause}</h4>
+                            <p class="text-xs text-slate-400 mt-0.5">Linked Transaction: <strong class="text-emerald-400 font-mono">${inc.transactionId}</strong></p>
+                        </div>
+                    </div>
+                    <button onclick='openAiModal(${JSON.stringify(inc)})' class="py-2 px-4 rounded-xl bg-[#1E293B] hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-2 border border-slate-700 transition-colors ml-auto md:ml-0">
+                        <i class="fa-solid fa-microchip text-emerald-400"></i>
+                        <span>AI Diagnostics</span>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function openAiModal(inc) {
+            selectedIncidentForModal = inc;
+            document.getElementById('ai-modal-subtitle').innerText = `Diagnostic analysis for Incident ${inc.id}`;
+            document.getElementById('ai-modal-cause').innerText = inc.rootCause;
+            document.getElementById('ai-modal-conf').innerText = `${(inc.confidenceScore * 100).toFixed(0)}%`;
+            document.getElementById('ai-modal-impact').innerText = inc.businessImpact;
+            document.getElementById('ai-modal-action').innerText = inc.recommendedAction;
+            document.getElementById('ai-modal').classList.remove('hidden');
+            document.getElementById('ai-modal').classList.add('flex');
+        }
+
+        function closeAiModal() {
+            document.getElementById('ai-modal').classList.add('hidden');
+            document.getElementById('ai-modal').classList.remove('flex');
+        }
+
+        function gotoRecoveryFromModal() {
+            closeAiModal();
+            switchTab('recovery');
+        }
+
+        // ================= RECOVERY CENTER VIEW =================
+        function renderRecoveries() {
+            const container = document.getElementById('recoveries-container');
+            const pendingCount = recoveries.filter(r => !r.executed).length;
+            document.getElementById('pending-recoveries-badge').innerText = `${pendingCount} Pending`;
+
+            container.innerHTML = recoveries.map(rec => {
+                const tx = transactions.find(t => t.id === rec.transactionId);
+                return `
+                    <div class="p-5 rounded-xl bg-[#090D16]/60 border border-[#1E293B] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-3">
+                                <span class="font-mono font-bold text-sm text-emerald-400">${rec.id}</span>
+                                <span class="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-[#1E293B] text-slate-300">Tx: ${rec.transactionId}</span>
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${rec.executed ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : rec.approved ? 'bg-sky-500/10 text-sky-400 border border-sky-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}">${rec.executed ? 'EXECUTED' : rec.approved ? 'APPROVED' : 'PENDING APPROVAL'}</span>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-slate-200">${rec.description}</p>
+                                ${tx ? `<p class="text-xs text-slate-400 mt-1">Customer: <span class="text-slate-300 font-mono">${tx.customerId}</span> | Amount: <span class="text-slate-300 font-mono">$${tx.amount}</span> | Idempotency Key: <span class="text-emerald-400 font-mono">${tx.idempotencyKey}</span></p>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 ml-auto md:ml-0">
+                            ${!rec.approved && !rec.executed ? `<button onclick="approveRecovery('${rec.id}')" class="py-2 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors">Approve Recovery</button>` : ''}
+                            ${rec.approved && !rec.executed ? `<button onclick="executeRecovery('${rec.id}')" class="py-2 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold shadow-lg shadow-emerald-500/20 transition-colors flex items-center gap-1.5"><i class="fa-solid fa-play"></i><span>Execute Recovery</span></button>` : ''}
+                            ${rec.executed ? `<div class="flex items-center gap-1.5 text-emerald-400 text-xs font-mono font-bold px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30"><i class="fa-solid fa-circle-check"></i><span>Verified & Resolved</span></div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function approveRecovery(recId) {
+            recoveries = recoveries.map(r => r.id === recId ? { ...r, approved: true } : r);
+            persistData();
+            refreshAllViews();
+            showToast(`Recovery action ${recId} approved by administrator.`, 'success');
+        }
+
+        function executeRecovery(recId) {
+            const rec = recoveries.find(r => r.id === recId);
+            if (!rec) return;
+
+            rec.executed = true;
+
+            // Update transaction
+            transactions = transactions.map(tx => {
+                if (tx.id === rec.transactionId) {
+                    const audit = [...tx.auditTrail, `[${new Date().toISOString()}] RECOVERY EXECUTED: Admin approved recovery action (${rec.actionType}). Payment verified & re-established.`];
+                    return { ...tx, status: 'SUCCESS', paymentVerified: true, auditTrail: audit };
+                }
+                return tx;
+            });
+
+            // Resolve incident
+            incidents = incidents.map(inc => {
+                if (inc.transactionId === rec.transactionId) {
+                    return { ...inc, status: 'RESOLVED' };
+                }
+                return inc;
+            });
+
+            persistData();
+            refreshAllViews();
+            showToast(`Recovery executed successfully for ${rec.transactionId}. Incident resolved.`, 'success');
+        }
+
+        // Startup initialization on window load
+        window.onload = function() {
+            loadData();
+            refreshAllViews();
+        };
+    </script>
+</body>
+</html>
